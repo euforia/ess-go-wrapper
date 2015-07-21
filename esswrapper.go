@@ -167,5 +167,9 @@ func (e *EssWrapper) initializeIndex(mappingFile string) error {
 	}
 	log.V(3).Infof("Index created: %s %s\n", e.Index, resp)
 
-	return e.applyMappingFile(mappingFile)
+	if len(mappingFile) > 1 {
+		return e.applyMappingFile(mappingFile)
+	}
+
+	return nil
 }
