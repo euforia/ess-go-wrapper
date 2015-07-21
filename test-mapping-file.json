@@ -1,0 +1,40 @@
+{
+    "test_mapping": {
+        "_timestamp" : {
+            "enabled" : true,
+            "store" : true
+        },
+        "dynamic_templates": [
+            {
+                "timestamp": {
+                    "match"             : "timestamp",
+                    "mapping"           : {"type": "float"}
+                }
+            },{
+                "tagbranch": {
+                    "match"             : "tagbranch",
+                    "mapping"           : {"type": "string", "index": "not_analyzed"}
+                }
+            },{
+                "name": {
+                    "match"             : "name",
+                    "mapping"           : {"type": "string", "index": "not_analyzed"}
+                }
+            },{
+                "version": {
+                    "match"             : "version",
+                    "mapping"           : {"type": "string", "index": "not_analyzed"}
+                }
+            },{
+                "Package": {
+                    "match": "Package",
+                    "mapping": { "type": "object" },
+                    "properties": {
+                        "name": { "type": "string", "index": "not_analyzed" },
+                        "version": { "type": "string", "index": "not_analyzed" }
+                    }
+                }
+            }
+        ]
+    }
+}
