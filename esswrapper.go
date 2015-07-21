@@ -11,30 +11,6 @@ import (
 	"strings"
 )
 
-type EssVersion struct {
-	Number         string `json:"number"`
-	BuildHash      string `json:"build_hash"`
-	BuildTimestamp string `json:"build_timestamp"`
-	BuildSnapshot  bool   `json:"build_snapshot"`
-	LuceneVersion  string `json:"lucene_version"`
-}
-
-type EssInfo struct {
-	Status      int64      `json:"status"`
-	Name        string     `json:"name"`
-	ClusterName string     `json:"cluster_name"`
-	Version     EssVersion `json:"version"`
-	Tagline     string     `json:"tagline"`
-}
-
-/*
-   Generic wrapper to elasticsearch
-*/
-type EssMapping struct {
-	Meta             map[string]interface{} `json:"_meta"`
-	DynamicTemplates []interface{}          `json:"dynamic_templates"`
-}
-
 type EssWrapper struct {
 	conn  *elastigo.Conn
 	Index string
@@ -45,16 +21,12 @@ type EssWrapper struct {
    Optionally apply a default mapping if mapping file supplied.
 */
 func NewEssWrapper(esshost string, essport int, index string, mappingfile ...string) (*EssWrapper, error) {
-	ed := EssWrapper{}
 
-	c := elastigo.NewConn()
-	c.Domain = esshost
-	c.Port = fmt.Sprintf("%d", essport)
+	ed := EssWrapper{conn: elastigo.NewConn(), Index: index}
+	ed.conn.Domain = esshost
+	ed.conn.Port = fmt.Sprintf("%d", essport)
 
-	ed.conn = c
-	ed.Index = index
-
-	exists, err := c.ExistsIndex(index, "", nil)
+	exists, err := ed.conn.ExistsIndex(index, "", nil)
 	if err != nil {
 		if err.Error() == "record not found" {
 			exists = false
@@ -63,12 +35,17 @@ func NewEssWrapper(esshost string, essport int, index string, mappingfile ...str
 		}
 	}
 
-	if !exists && len(mappingfile) > 0 && len(mappingfile[0]) > 0 {
-		return &ed, ed.initializeIndex(mappingfile[0])
+	if !exists {
+		if len(mappingfile) > 1 {
+			return &ed, ed.initializeIndex(mappingfile[0])
+		} else {
+			return &ed, ed.initializeIndex("")
+		}
 	}
 	return &ed, nil
 }
 
+/* Used to determine if the mapping file can be applied with the given version */
 func (e *EssWrapper) IsVersionSupported() (supported bool) {
 	supported = false
 
@@ -91,64 +68,12 @@ func (e *EssWrapper) IsVersionSupported() (supported bool) {
 	return
 }
 
-func (e *EssWrapper) applyMappingFile(mapfile string) error {
-	if !e.IsVersionSupported() {
-		log.Warningf("Not creating mapping. ESS version not supported. Must be > 1.4.")
-		return nil
-	}
-
-	if _, err := os.Stat(mapfile); err != nil {
-		return fmt.Errorf("Mapping file not found %s: %s", mapfile, err)
-	}
-
-	mdb, err := ioutil.ReadFile(mapfile)
-	if err != nil {
-		return err
-	}
-	var mapData map[string]interface{}
-	if err = json.Unmarshal(mdb, &mapData); err != nil {
-		return err
-	}
-	// Get map name from first key
-	var (
-		normMap  = map[string]interface{}{}
-		mapname  string
-		mapbytes []byte
-	)
-	for k, _ := range mapData {
-		normMap[k] = mapData[k]
-		mapname = k
-		break
-	}
-
-	if mapbytes, err = json.Marshal(normMap); err != nil {
-		return err
-	}
-	log.V(10).Infof("Mapping (%s): %s\n", mapname, mapbytes)
-
-	b, err := e.conn.DoCommand("PUT", fmt.Sprintf("/%s/_mapping/%s", e.Index, mapname), nil, mapbytes)
-	if err != nil {
-		return err
-	}
-	log.Warningf("Updated '%s' mapping for %s: %s\n", mapname, e.Index, b)
-	return nil
-}
-
+/* Elasticsearch instance information.  e.g. version */
 func (e *EssWrapper) Info() (info EssInfo, err error) {
 	var b []byte
 	b, err = e.conn.DoCommand("GET", "", nil, nil)
 	err = json.Unmarshal(b, &info)
 	return
-}
-
-func (e *EssWrapper) initializeIndex(mappingFile string) error {
-	resp, err := e.conn.CreateIndex(e.Index)
-	if err != nil {
-		return err
-	}
-	log.V(3).Infof("Index created: %s %s\n", e.Index, resp)
-
-	return e.applyMappingFile(mappingFile)
 }
 
 func (e *EssWrapper) AddWithId(docType, id string, data interface{}) (string, error) {
@@ -189,4 +114,58 @@ func (e *EssWrapper) Update(docType, id string, data interface{}) error {
 	log.V(10).Infof("Updated: %s\n", b)
 	log.V(10).Infof("Updated: %#v\n", resp)
 	return nil
+}
+
+func (e *EssWrapper) applyMappingFile(mapfile string) error {
+	if !e.IsVersionSupported() {
+		log.Warningf("Not creating mapping. ESS version not supported. Must be > 1.4.")
+		return nil
+	}
+
+	if _, err := os.Stat(mapfile); err != nil {
+		log.Warningf("Not creating mapping. Mapping file not found (%s): %s", mapfile, err)
+		return nil
+	}
+
+	mdb, err := ioutil.ReadFile(mapfile)
+	if err != nil {
+		return err
+	}
+	var mapData map[string]interface{}
+	if err = json.Unmarshal(mdb, &mapData); err != nil {
+		return err
+	}
+	// Get map name from first key
+	var (
+		normMap  = map[string]interface{}{}
+		mapname  string
+		mapbytes []byte
+	)
+	for k, _ := range mapData {
+		normMap[k] = mapData[k]
+		mapname = k
+		break
+	}
+
+	if mapbytes, err = json.Marshal(normMap); err != nil {
+		return err
+	}
+	log.V(10).Infof("Mapping (%s): %s\n", mapname, mapbytes)
+
+	b, err := e.conn.DoCommand("PUT", fmt.Sprintf("/%s/_mapping/%s", e.Index, mapname), nil, mapbytes)
+	if err != nil {
+		return err
+	}
+	log.Warningf("Updated '%s' mapping for %s: %s\n", mapname, e.Index, b)
+	return nil
+}
+
+func (e *EssWrapper) initializeIndex(mappingFile string) error {
+	resp, err := e.conn.CreateIndex(e.Index)
+	if err != nil {
+		return err
+	}
+	log.V(3).Infof("Index created: %s %s\n", e.Index, resp)
+
+	return e.applyMappingFile(mappingFile)
 }
