@@ -18,7 +18,7 @@ type EssWrapper struct {
 
 /*
    Create the index if it does not exist.
-   Optionally apply a default mapping if mapping file supplied.
+   Optionally apply a mapping if mapping file is supplied.
 */
 func NewEssWrapper(esshost string, essport int, index string, mappingfile ...string) (*EssWrapper, error) {
 
@@ -43,6 +43,30 @@ func NewEssWrapper(esshost string, essport int, index string, mappingfile ...str
 		}
 	}
 	return &ed, nil
+}
+
+func (e *EssWrapper) GetTypes() (types []string, err error) {
+	var (
+		b []byte
+	)
+
+	if b, err = e.conn.DoCommand("GET", "/"+e.Index+"/_mapping", nil, nil); err != nil {
+		return
+	}
+
+	m := map[string]map[string]map[string]interface{}{}
+	if err = json.Unmarshal(b, &m); err != nil {
+		return
+	}
+
+	types = make([]string, len(m[e.Index]["mappings"]))
+	i := 0
+	for k, _ := range m[e.Index]["mappings"] {
+		types[i] = k
+		i++
+	}
+
+	return
 }
 
 /* Used to determine if the mapping file can be applied with the given version */
@@ -87,6 +111,10 @@ func (e *EssWrapper) AddWithId(docType, id string, data interface{}) (string, er
 	}
 
 	return resp.Id, nil
+}
+
+func (e *EssWrapper) Close() {
+	e.conn.Close()
 }
 
 /*

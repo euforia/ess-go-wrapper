@@ -28,11 +28,29 @@ func Test_NewEssWrapper(t *testing.T) {
 
 func Test_NewEssWrapper_Info(t *testing.T) {
 	ess, _ := NewEssWrapper(testEssHost, testEssPort, testIndex)
+	defer ess.Close()
+
 	info, err := ess.Info()
 	if err != nil {
 		t.Fatalf("%s", err)
 	}
 	t.Logf("%#v\n", info)
+}
+
+func Test_NewEssWrapper_GetTypes(t *testing.T) {
+	ess, _ := NewEssWrapper(testEssHost, testEssPort, testIndex)
+	defer ess.Close()
+
+	types, err := ess.GetTypes()
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	if len(types) != 0 {
+		t.Fatalf("Mismatch!")
+	}
+
+	t.Logf("%v", types)
 }
 
 func Test_NewEssWrapper_Cleanup(t *testing.T) {
