@@ -92,6 +92,10 @@ func (e *EssWrapper) GetTypes() (types []string, err error) {
 	if err = json.Unmarshal(b, &m); err != nil {
 		return
 	}
+	// Remove _default_ map
+	if _, ok := m[e.Index]["mappings"]["_default_"]; ok {
+		delete(m[e.Index]["mappings"], "_default_")
+	}
 
 	types = make([]string, len(m[e.Index]["mappings"]))
 	i := 0
@@ -135,13 +139,14 @@ func (e *EssWrapper) Info() (info EssInfo, err error) {
 }
 
 func (e *EssWrapper) AddWithId(docType, id string, data interface{}) (string, error) {
+	//log.V(10).Infof("%v\n", data)
 	resp, err := e.conn.Index(e.Index, docType, id, nil, data)
 	if err != nil {
 		log.Warningf("%s\n", err)
 		return "", err
 	}
 	if !resp.Created {
-		return "", fmt.Errorf("Failed to record job: %s", resp)
+		return "", fmt.Errorf("Failed: %s", resp)
 	}
 
 	return resp.Id, nil
