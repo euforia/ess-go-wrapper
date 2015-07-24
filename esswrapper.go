@@ -26,23 +26,57 @@ func NewEssWrapper(esshost string, essport int, index string, mappingfile ...str
 	ed.conn.Domain = esshost
 	ed.conn.Port = fmt.Sprintf("%d", essport)
 
-	exists, err := ed.conn.ExistsIndex(index, "", nil)
-	if err != nil {
-		if err.Error() == "record not found" {
-			exists = false
-		} else {
-			return &ed, err
-		}
-	}
-
-	if !exists {
-		if len(mappingfile) > 1 {
+	if !ed.IndexExists() {
+		if len(mappingfile) > 0 {
+			log.V(9).Infof("Initializing with mapping file: %#v\n", mappingfile[0])
 			return &ed, ed.initializeIndex(mappingfile[0])
 		} else {
 			return &ed, ed.initializeIndex("")
 		}
 	}
 	return &ed, nil
+}
+
+func (e *EssWrapper) IndexExists() bool {
+	_, err := e.conn.DoCommand("GET", "/"+e.Index, nil, nil)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func (e *EssWrapper) Get(docType, id string) (elastigo.BaseResponse, error) {
+	return e.conn.Get(e.Index, docType, id, nil)
+}
+
+func (e *EssWrapper) Delete(docType, id string) bool {
+	resp, err := e.conn.Delete(e.Index, docType, id, nil)
+	if err != nil {
+		log.Errorf("%s\n", err)
+		return false
+	}
+	return resp.Found
+}
+
+/*
+	Get document by a given attribute and value using {query:{term:{attribute:value}}}
+*/
+func (e *EssWrapper) GetBy(docType, attribute, value string) (out []elastigo.Hit, err error) {
+	// TODO: this may need a second pass
+	var (
+		rslt  elastigo.SearchResult
+		query = fmt.Sprintf(`{"query":{"term":{"%s":"%s"}}}`, attribute, value)
+	)
+
+	log.V(10).Infof("GetBy query: %s\n", query)
+
+	if rslt, err = e.conn.Search(e.Index, docType, nil, query); err != nil {
+		return
+	}
+
+	log.V(10).Infof("Hits: %d; Total: %d\n", rslt.Hits.Len(), rslt.Hits.Total)
+	out = rslt.Hits.Hits
+	return
 }
 
 func (e *EssWrapper) GetTypes() (types []string, err error) {
@@ -144,7 +178,7 @@ func (e *EssWrapper) Update(docType, id string, data interface{}) error {
 	return nil
 }
 
-func (e *EssWrapper) applyMappingFile(mapfile string) error {
+func (e *EssWrapper) applyMappingFile(mapfile string) (err error) {
 	if !e.IsVersionSupported() {
 		log.Warningf("Not creating mapping. ESS version not supported. Must be > 1.4.")
 		return nil
@@ -154,14 +188,14 @@ func (e *EssWrapper) applyMappingFile(mapfile string) error {
 		log.Warningf("Not creating mapping. Mapping file not found (%s): %s", mapfile, err)
 		return nil
 	}
-
+	// Read mapping file to get map name
 	mdb, err := ioutil.ReadFile(mapfile)
 	if err != nil {
-		return err
+		return
 	}
 	var mapData map[string]interface{}
 	if err = json.Unmarshal(mdb, &mapData); err != nil {
-		return err
+		return
 	}
 	// Get map name from first key
 	var (
@@ -176,15 +210,14 @@ func (e *EssWrapper) applyMappingFile(mapfile string) error {
 	}
 
 	if mapbytes, err = json.Marshal(normMap); err != nil {
-		return err
+		return
 	}
 	log.V(10).Infof("Mapping (%s): %s\n", mapname, mapbytes)
 
-	b, err := e.conn.DoCommand("PUT", fmt.Sprintf("/%s/_mapping/%s", e.Index, mapname), nil, mapbytes)
-	if err != nil {
-		return err
+	if _, err = e.conn.DoCommand("PUT", fmt.Sprintf("/%s/_mapping/%s", e.Index, mapname), nil, mapbytes); err != nil {
+		return
 	}
-	log.Warningf("Updated '%s' mapping for %s: %s\n", mapname, e.Index, b)
+	log.Infof("Updated '%s' mapping for index '%s'\n", mapname, e.Index)
 	return nil
 }
 
@@ -196,6 +229,7 @@ func (e *EssWrapper) initializeIndex(mappingFile string) error {
 	log.V(3).Infof("Index created: %s %s\n", e.Index, resp)
 
 	if len(mappingFile) > 1 {
+		log.V(6).Infof("Applying mapping file: %s\n", mappingFile)
 		return e.applyMappingFile(mappingFile)
 	}
 
