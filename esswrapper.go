@@ -45,6 +45,10 @@ func (e *EssWrapper) IndexExists() bool {
 	return true
 }
 
+func (e *EssWrapper) Search(docType string, query interface{}) (elastigo.SearchResult, error) {
+	return e.conn.Search(e.Index, docType, nil, query)
+}
+
 func (e *EssWrapper) Get(docType, id string) (elastigo.BaseResponse, error) {
 	return e.conn.Get(e.Index, docType, id, nil)
 }
@@ -169,18 +173,18 @@ func (e *EssWrapper) Add(docType string, data interface{}) (string, error) {
        id      : document id
        data    : arbitrary data
 */
-func (e *EssWrapper) Update(docType, id string, data interface{}) error {
+func (e *EssWrapper) Update(docType, id string, data interface{}) (string, error) {
 	resp, err := e.conn.Index(e.Index, docType, id, nil, data)
 	if err != nil {
 		log.Warningf("%s\n", err)
-		return err
+		return "", err
 	}
 
 	log.V(10).Infof("Updated: %#v\n", data)
 	b, _ := json.MarshalIndent(data, "", "  ")
 	log.V(10).Infof("Updated: %s\n", b)
 	log.V(10).Infof("Updated: %#v\n", resp)
-	return nil
+	return id, nil
 }
 
 func (e *EssWrapper) applyMappingFile(mapfile string) (err error) {
