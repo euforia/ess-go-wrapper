@@ -70,29 +70,6 @@ func (e *EssWrapper) Delete(docType, id string) bool {
 	return resp.Found
 }
 
-/*
-	Get document by a given attribute and value using {query:{term:{attribute:value}}}
-*/
-/*
-func (e *EssWrapper) GetBy(docType, attribute, value string) (out []elastigo.Hit, err error) {
-	// TODO: this may need a second pass
-	var (
-		rslt elastigo.SearchResult
-		query = fmt.Sprintf(`{"query":{"term":{"%s":"%s"}}}`, attribute, value)
-		//query = elastigo.Query().Term(attribute, value)
-	)
-
-	log.V(10).Infof("GetBy query: %s\n", query)
-
-	if rslt, err = e.conn.Search(e.Index, docType, nil, query); err != nil {
-		return
-	}
-
-	log.V(10).Infof("Hits: %d; Total: %d\n", rslt.Hits.Len(), rslt.Hits.Total)
-	out = rslt.Hits.Hits
-	return
-}
-*/
 func (e *EssWrapper) GetTypes() (types []string, err error) {
 	var (
 		b []byte

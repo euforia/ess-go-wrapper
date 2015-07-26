@@ -19,6 +19,9 @@ var (
 		"name": "test2",
 		"host": "test.foo.bar",
 	}
+	testUpdateData = map[string]string{
+		"host": "test.foo.bar.updated",
+	}
 )
 
 func CleanupRun() {
@@ -88,6 +91,22 @@ func Test_NewEssWrapper_AddWithId(t *testing.T) {
 
 }
 
+func Test_NewEssWrapper_Updated(t *testing.T) {
+
+	_, err := testEssWrapper.Update("test_type", "test2.id", testUpdateData)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	resp, err := testEssWrapper.Get("test_type", "test2.id")
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+	if !resp.Found {
+		t.Fatalf("Not found")
+	}
+}
+
 func Test_NewEssWrapper_GetTypes(t *testing.T) {
 
 	types, err := testEssWrapper.GetTypes()
@@ -112,21 +131,6 @@ func Test_NewEssWrapper_Get(t *testing.T) {
 
 }
 
-/*
-func Test_NewEssWrapper_GetBy(t *testing.T) {
-
-	items, err := testEssWrapper.GetBy("test_type", "name", testData["name"])
-	if err != nil {
-		t.Errorf("%s", err)
-	}
-	if len(items) < 1 {
-		t.Errorf("No items found")
-	} else {
-		t.Logf("%v", items)
-	}
-
-}
-*/
 func Test_NewEssWrapper_Delete(t *testing.T) {
 	if !testEssWrapper.Delete("test_type", "test1.id") {
 		t.Errorf("Failed to delete")
