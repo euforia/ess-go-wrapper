@@ -45,6 +45,14 @@ func (e *EssWrapper) IndexExists() bool {
 	return true
 }
 
+/*
+func (e *EssWrapper) SearchUsingFilters(docType string, filterOps ...interface{}) (elastigo.SearchResult, error) {
+	query := elastigo.Search(e.Index).Filter(filterOps...)
+	return e.conn.Search(e.Index, docType, nil, query)
+}
+*/
+
+/* Raw search */
 func (e *EssWrapper) Search(docType string, query interface{}) (elastigo.SearchResult, error) {
 	return e.conn.Search(e.Index, docType, nil, query)
 }
@@ -65,11 +73,13 @@ func (e *EssWrapper) Delete(docType, id string) bool {
 /*
 	Get document by a given attribute and value using {query:{term:{attribute:value}}}
 */
+/*
 func (e *EssWrapper) GetBy(docType, attribute, value string) (out []elastigo.Hit, err error) {
 	// TODO: this may need a second pass
 	var (
-		rslt  elastigo.SearchResult
+		rslt elastigo.SearchResult
 		query = fmt.Sprintf(`{"query":{"term":{"%s":"%s"}}}`, attribute, value)
+		//query = elastigo.Query().Term(attribute, value)
 	)
 
 	log.V(10).Infof("GetBy query: %s\n", query)
@@ -82,7 +92,7 @@ func (e *EssWrapper) GetBy(docType, attribute, value string) (out []elastigo.Hit
 	out = rslt.Hits.Hits
 	return
 }
-
+*/
 func (e *EssWrapper) GetTypes() (types []string, err error) {
 	var (
 		b []byte

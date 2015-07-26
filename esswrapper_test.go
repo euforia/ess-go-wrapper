@@ -112,6 +112,7 @@ func Test_NewEssWrapper_Get(t *testing.T) {
 
 }
 
+/*
 func Test_NewEssWrapper_GetBy(t *testing.T) {
 
 	items, err := testEssWrapper.GetBy("test_type", "name", testData["name"])
@@ -125,7 +126,7 @@ func Test_NewEssWrapper_GetBy(t *testing.T) {
 	}
 
 }
-
+*/
 func Test_NewEssWrapper_Delete(t *testing.T) {
 	if !testEssWrapper.Delete("test_type", "test1.id") {
 		t.Errorf("Failed to delete")
